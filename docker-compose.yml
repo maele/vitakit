@@ -1,0 +1,22 @@
+services:
+  vitakit:
+    build: .
+    container_name: vitakit
+    ports:
+      - "5050:5050"
+    volumes:
+      - vitakit-data:/app/data   # saved CVs survive rebuilds & upgrades
+    restart: unless-stopped      # restarts on crash AND on OS boot
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: vitakit-tunnel
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - vitakit
+
+volumes:
+  vitakit-data:

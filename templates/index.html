@@ -1,0 +1,796 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VitaKit — Open-source CV studio</title>
+<meta name="description" content="VitaKit: a free, open-source CV builder with live preview and print-to-PDF.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3' y='2' width='18' height='20' rx='3' fill='%230B1526'/%3E%3Cpath d='M8 9l4 8 4-8' stroke='%23F04E23' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: { extend: {
+    colors: {
+      ink: '#0B1526',
+      line: '#E3E7EC',
+      accent: { DEFAULT: '#F04E23', dark: '#D8400F', soft: '#FEEDE6' },
+    },
+    fontFamily: {
+      display: ['"Bricolage Grotesque"', 'sans-serif'],
+      sans: ['"Public Sans"', 'system-ui', 'sans-serif'],
+    },
+  }}
+};
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style type="text/tailwindcss">
+  .dotgrid { background-image: radial-gradient(circle, #C9CFD9 1px, transparent 1px); background-size: 18px 18px; }
+  .lbl { @apply mb-1 block text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500; }
+  .inp { @apply w-full rounded-md border border-line bg-white px-3 py-2 text-[13.5px] text-ink shadow-sm outline-none transition placeholder:text-slate-400 focus:border-accent focus:ring-2 focus:ring-accent/25; }
+  .btn { @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-semibold transition active:translate-y-[1px]; }
+  .btn-dark { @apply bg-white/10 text-white hover:bg-white/20; }
+  .btn-ghost { @apply text-white/70 hover:bg-white/10 hover:text-white; }
+  .btn-accent { @apply bg-accent text-white shadow-[0_6px_16px_rgba(240,78,35,.35)] hover:bg-accent-dark hover:shadow-[0_8px_20px_rgba(240,78,35,.45)]; }
+  .btn-light { @apply border border-line bg-white text-ink hover:border-slate-300 hover:bg-slate-50; }
+  .icon-btn { @apply grid h-7 w-7 place-items-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-ink disabled:pointer-events-none disabled:opacity-30; }
+  .tab { @apply rounded-md px-3 py-1.5 text-[13px] font-semibold text-slate-500 transition; }
+  .tab-on { @apply bg-ink text-white; }
+
+  details.sec summary { list-style: none; }
+  details.sec summary::-webkit-details-marker { display: none; }
+  details.sec summary .chev { transition: transform .25s ease; }
+  details.sec[open] summary .chev { transform: rotate(180deg); }
+  .sec-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .28s cubic-bezier(.4,0,.2,1); }
+  details.sec[open] .sec-body { grid-template-rows: 1fr; }
+  .sec-body > div { overflow: hidden; }
+
+  @media (max-width: 1023px) {
+    body.pv #editorPane { display: none; }
+    body:not(.pv) #previewPane { display: none; }
+  }
+</style>
+</head>
+<body class="min-h-full bg-[#ECEEF2] font-sans text-ink antialiased">
+
+<!-- Ambient layered background -->
+<div class="pointer-events-none fixed inset-0 -z-10">
+  <div class="dotgrid absolute inset-0 opacity-50"></div>
+  <div class="absolute -top-32 right-[-8%] h-96 w-96 rounded-full bg-accent/[0.07] blur-3xl"></div>
+  <div class="absolute bottom-[-18%] left-[-6%] h-[28rem] w-[28rem] rounded-full bg-[#0E7C66]/[0.06] blur-3xl"></div>
+</div>
+
+<!-- ======================= Header ======================= -->
+<header class="sticky top-0 z-40 bg-ink text-white shadow-lg shadow-ink/20">
+  <div class="mx-auto flex h-14 max-w-[1440px] items-center gap-3 px-4">
+    <a href="/" class="flex items-center gap-2.5">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="3" y="2" width="18" height="20" rx="3" fill="#fff"/>
+        <path d="M8 9l4 8 4-8" stroke="#F04E23" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="font-display text-[17px] font-bold tracking-tight">VitaKit</span>
+      <span class="hidden rounded-full border border-white/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white/60 sm:inline">open source · v0.2</span>
+    </a>
+
+    <div class="ml-auto hidden items-center gap-2 md:flex">
+      <span id="statusDot" class="h-2 w-2 rounded-full bg-amber-400"></span>
+      <span id="statusText" class="text-[12px] text-white/60">Local draft</span>
+    </div>
+
+    <div class="ml-auto flex items-center gap-1.5 md:ml-6">
+      <button id="importBtn" class="btn btn-ghost !px-2.5" title="Import JSON">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 21V9m0 0l-4 4m4-4l4 4M5 3h14"/></svg>
+        <span class="hidden lg:inline">Import</span>
+      </button>
+      <button id="exportBtn" class="btn btn-ghost !px-2.5" title="Export JSON">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
+        <span class="hidden lg:inline">Export</span>
+      </button>
+      <span class="mx-1 h-5 w-px bg-white/15"></span>
+      <button id="saveBtn" class="btn bg-white text-ink hover:bg-orange-50">
+        Save <kbd class="hidden rounded border border-slate-300 px-1 text-[10px] text-slate-500 xl:inline">⌘S</kbd>
+      </button>
+      <button id="pdfBtn" class="btn btn-accent">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2m-12-3h12v6H6z"/></svg>
+        <span class="hidden sm:inline">PDF</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ======================= Main ======================= -->
+<main class="mx-auto grid max-w-[1440px] gap-5 px-4 py-5 lg:h-[calc(100dvh-57px)] lg:grid-cols-[minmax(370px,470px)_minmax(0,1fr)] lg:overflow-hidden">
+
+  <!-- Mobile tabs -->
+  <div class="grid grid-cols-2 gap-1 rounded-lg border border-line bg-white p-1 lg:hidden">
+    <button id="tabEdit" class="tab tab-on">Edit</button>
+    <button id="tabPreview" class="tab">Preview</button>
+  </div>
+
+  <!-- ============ Editor pane ============ -->
+  <section id="editorPane" class="space-y-4 pb-8 lg:h-full lg:overflow-y-auto lg:pb-4 lg:pr-1">
+
+    <!-- CV strength -->
+    <div class="rounded-xl border border-line bg-white p-4 shadow-sm">
+      <div class="flex items-baseline justify-between">
+        <p class="font-display text-[15px] font-bold">CV strength</p>
+        <span id="scoreLabel" class="text-[12px] font-bold text-accent">0%</span>
+      </div>
+      <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200">
+        <div id="scoreBar" class="h-full w-0 rounded-full bg-accent transition-all duration-500"></div>
+      </div>
+      <p id="scoreHint" class="mt-2 text-[12px] text-slate-500">Add a name and a summary to get rolling.</p>
+    </div>
+
+    <!-- Personal -->
+    <details class="sec overflow-hidden rounded-xl border border-line bg-white shadow-sm" open>
+      <summary class="flex cursor-pointer select-none items-center gap-2.5 px-4 py-3 hover:bg-slate-50">
+        <span class="grid h-7 w-7 place-items-center rounded-lg bg-accent-soft text-accent">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>
+        </span>
+        <span class="font-display text-[14px] font-bold">Personal details</span>
+        <svg class="chev ml-auto text-slate-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
+      <div class="sec-body"><div><div class="space-y-3 p-4 pt-2">
+        <div class="grid grid-cols-2 gap-3">
+          <div class="col-span-2"><label class="lbl">Full name</label><input class="inp" data-path="basics.name" data-sum placeholder="Alex Rivera"></div>
+          <div class="col-span-2"><label class="lbl">Job title</label><input class="inp" data-path="basics.title" placeholder="Senior Product Designer"></div>
+          <div><label class="lbl">Email</label><input class="inp" type="email" data-path="basics.email" placeholder="you@example.com"></div>
+          <div><label class="lbl">Phone</label><input class="inp" data-path="basics.phone" placeholder="+1 555 000 0000"></div>
+          <div><label class="lbl">Location</label><input class="inp" data-path="basics.location" placeholder="Lisbon, Portugal"></div>
+          <div><label class="lbl">Website</label><input class="inp" data-path="basics.website" placeholder="yoursite.com"></div>
+        </div>
+      </div></div></div>
+    </details>
+
+    <!-- Summary -->
+    <details class="sec overflow-hidden rounded-xl border border-line bg-white shadow-sm" open>
+      <summary class="flex cursor-pointer select-none items-center gap-2.5 px-4 py-3 hover:bg-slate-50">
+        <span class="grid h-7 w-7 place-items-center rounded-lg bg-accent-soft text-accent">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+        </span>
+        <span class="font-display text-[14px] font-bold">Profile summary</span>
+        <svg class="chev ml-auto text-slate-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
+      <div class="sec-body"><div><div class="space-y-1 p-4 pt-2">
+        <textarea class="inp resize-y" rows="4" data-path="basics.summary" placeholder="Two or three sentences on who you are and the value you bring."></textarea>
+        <p class="text-right text-[11px] text-slate-400"><span id="sumCount">0</span> characters</p>
+      </div></div></div>
+    </details>
+
+    <!-- Experience -->
+    <details class="sec overflow-hidden rounded-xl border border-line bg-white shadow-sm" open>
+      <summary class="flex cursor-pointer select-none items-center gap-2.5 px-4 py-3 hover:bg-slate-50">
+        <span class="grid h-7 w-7 place-items-center rounded-lg bg-accent-soft text-accent">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+        </span>
+        <span class="font-display text-[14px] font-bold">Experience</span>
+        <span id="expBadge" class="rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-bold text-accent">0</span>
+        <svg class="chev ml-auto text-slate-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
+      <div class="sec-body"><div><div class="space-y-3 p-4 pt-2">
+        <div id="expList" data-list="experience" class="space-y-3"></div>
+        <button type="button" data-act="add-exp" class="btn btn-light w-full border-dashed">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Add experience
+        </button>
+      </div></div></div>
+    </details>
+
+    <!-- Industry experience -->
+    <details class="sec overflow-hidden rounded-xl border border-line bg-white shadow-sm">
+      <summary class="flex cursor-pointer select-none items-center gap-2.5 px-4 py-3 hover:bg-slate-50">
+        <span class="grid h-7 w-7 place-items-center rounded-lg bg-accent-soft text-accent">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 21h18M6 21V5a1 1 0 011-1h7a1 1 0 011 1v16M15 9h2a1 1 0 011 1v11M9 8h2M9 12h2M9 16h2"/></svg>
+        </span>
+        <span class="font-display text-[14px] font-bold">Industry experience</span>
+        <span id="industriesBadge" class="rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-bold text-accent">0</span>
+        <svg class="chev ml-auto text-slate-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
+      <div class="sec-body"><div><div class="space-y-1 p-4 pt-2">
+        <textarea id="industriesInput" class="inp resize-y" rows="2" data-path="industries" placeholder="SaaS, Fintech, Healthcare…"></textarea>
+        <p class="text-[11px] text-slate-400">Comma or new-line separated — shown as tags on the CV.</p>
+      </div></div></div>
+    </details>
+
+    <!-- Projects -->
+    <details class="sec overflow-hidden rounded-xl border border-line bg-white shadow-sm">
+      <summary class="flex cursor-pointer select-none items-center gap-2.5 px-4 py-3 hover:bg-slate-50">
+        <span class="grid h-7 w-7 place-items-center rounded-lg bg-accent-soft text-accent">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5v8l9 5 9-5V8z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg>
+        </span>
+        <span class="font-display text-[14px] font-bold">Projects</span>
+        <span id="projBadge" class="rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-bold text-accent">0</span>
+        <svg class="chev ml-auto text-slate-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
+      <div class="sec-body"><div><div class="space-y-3 p-4 pt-2">
+        <div id="projList" data-list="projects" class="space-y-3"></div>
+        <button type="button" data-act="add-proj" class="btn btn-light w-full border-dashed">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Add project
+        </button>
+      </div></div></div>
+    </details>
+
+    <!-- Education -->
+    <details class="sec overflow-hidden rounded-xl border border-line bg-white shadow-sm" open>
+      <summary class="flex cursor-pointer select-none items-center gap-2.5 px-4 py-3 hover:bg-slate-50">
+        <span class="grid h-7 w-7 place-items-center rounded-lg bg-accent-soft text-accent">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 9L12 4 2 9l10 5 10-5zM6 11v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5"/></svg>
+        </span>
+        <span class="font-display text-[14px] font-bold">Education</span>
+        <span id="eduBadge" class="rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-bold text-accent">0</span>
+        <svg class="chev ml-auto text-slate-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
+      <div class="sec-body"><div><div class="space-y-3 p-4 pt-2">
+        <div id="eduList" data-list="education" class="space-y-3"></div>
+        <button type="button" data-act="add-edu" class="btn btn-light w-full border-dashed">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Add education
+        </button>
+      </div></div></div>
+    </details>
+
+    <!-- Certifications -->
+    <details class="sec overflow-hidden rounded-xl border border-line bg-white shadow-sm">
+      <summary class="flex cursor-pointer select-none items-center gap-2.5 px-4 py-3 hover:bg-slate-50">
+        <span class="grid h-7 w-7 place-items-center rounded-lg bg-accent-soft text-accent">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M8.5 12.5L7 21l5-3 5 3-1.5-8.5"/></svg>
+        </span>
+        <span class="font-display text-[14px] font-bold">Certifications</span>
+        <span id="certsBadge" class="rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-bold text-accent">0</span>
+        <svg class="chev ml-auto text-slate-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
+      <div class="sec-body"><div><div class="space-y-3 p-4 pt-2">
+        <div id="certsList" data-list="certifications" class="space-y-3"></div>
+        <button type="button" data-act="add-cert" class="btn btn-light w-full border-dashed">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Add certification
+        </button>
+      </div></div></div>
+    </details>
+
+    <!-- Skills -->
+    <details class="sec overflow-hidden rounded-xl border border-line bg-white shadow-sm" open>
+      <summary class="flex cursor-pointer select-none items-center gap-2.5 px-4 py-3 hover:bg-slate-50">
+        <span class="grid h-7 w-7 place-items-center rounded-lg bg-accent-soft text-accent">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 4.9 5.6.8-4 3.9.9 5.4-4.9-2.6L7.1 17l.9-5.4-4-3.9 5.6-.8z"/></svg>
+        </span>
+        <span class="font-display text-[14px] font-bold">Skills</span>
+        <span id="skillsBadge" class="rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-bold text-accent">0</span>
+        <svg class="chev ml-auto text-slate-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
+      <div class="sec-body"><div><div class="space-y-1 p-4 pt-2">
+        <textarea id="skillsInput" class="inp resize-y" rows="3" data-path="skills" placeholder="Figma, Python, Public speaking…"></textarea>
+        <p class="text-[11px] text-slate-400">Separate with commas or new lines — they become chips on the CV.</p>
+      </div></div></div>
+    </details>
+
+    <!-- Tools -->
+    <details class="sec overflow-hidden rounded-xl border border-line bg-white shadow-sm">
+      <summary class="flex cursor-pointer select-none items-center gap-2.5 px-4 py-3 hover:bg-slate-50">
+        <span class="grid h-7 w-7 place-items-center rounded-lg bg-accent-soft text-accent">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+        </span>
+        <span class="font-display text-[14px] font-bold">Tools</span>
+        <span id="toolsBadge" class="rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-bold text-accent">0</span>
+        <svg class="chev ml-auto text-slate-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
+      <div class="sec-body"><div><div class="space-y-1 p-4 pt-2">
+        <textarea id="toolsInput" class="inp resize-y" rows="2" data-path="tools" placeholder="Figma, Notion, Jira, VS Code…"></textarea>
+        <p class="text-[11px] text-slate-400">Comma or new-line separated — shown as tags on the CV.</p>
+      </div></div></div>
+    </details>
+
+    <!-- Languages -->
+    <details class="sec overflow-hidden rounded-xl border border-line bg-white shadow-sm">
+      <summary class="flex cursor-pointer select-none items-center gap-2.5 px-4 py-3 hover:bg-slate-50">
+        <span class="grid h-7 w-7 place-items-center rounded-lg bg-accent-soft text-accent">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.7 2.7 4 5.7 4 9s-1.3 6.3-4 9c-2.7-2.7-4-5.7-4-9s1.3-6.3 4-9z"/></svg>
+        </span>
+        <span class="font-display text-[14px] font-bold">Languages</span>
+        <span id="langsBadge" class="rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-bold text-accent">0</span>
+        <svg class="chev ml-auto text-slate-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
+      <div class="sec-body"><div><div class="space-y-3 p-4 pt-2">
+        <div id="langsList" data-list="languages" class="space-y-3"></div>
+        <button type="button" data-act="add-lang" class="btn btn-light w-full border-dashed">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Add language
+        </button>
+      </div></div></div>
+    </details>
+
+    <!-- Interests -->
+    <details class="sec overflow-hidden rounded-xl border border-line bg-white shadow-sm">
+      <summary class="flex cursor-pointer select-none items-center gap-2.5 px-4 py-3 hover:bg-slate-50">
+        <span class="grid h-7 w-7 place-items-center rounded-lg bg-accent-soft text-accent">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.7C7.2 16.9 3.5 13.6 3.5 9.9 3.5 7.2 5.6 5.3 8 5.3c1.6 0 3 .8 4 2.2 1-1.4 2.4-2.2 4-2.2 2.4 0 4.5 1.9 4.5 4.6 0 3.7-3.7 7-8.5 10.8z"/></svg>
+        </span>
+        <span class="font-display text-[14px] font-bold">Interests</span>
+        <span id="interestsBadge" class="rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-bold text-accent">0</span>
+        <svg class="chev ml-auto text-slate-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
+      <div class="sec-body"><div><div class="space-y-1 p-4 pt-2">
+        <textarea id="interestsInput" class="inp resize-y" rows="2" data-path="interests" placeholder="Photography, Trail running, Chess…"></textarea>
+        <p class="text-[11px] text-slate-400">Comma or new-line separated — shown as tags on the CV.</p>
+      </div></div></div>
+    </details>
+
+    <!-- References -->
+    <details class="sec overflow-hidden rounded-xl border border-line bg-white shadow-sm" open>
+      <summary class="flex cursor-pointer select-none items-center gap-2.5 px-4 py-3 hover:bg-slate-50">
+        <span class="grid h-7 w-7 place-items-center rounded-lg bg-accent-soft text-accent">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-5.5 6.5-5.5s6.5 1.9 6.5 5.5"/><circle cx="17.5" cy="9.5" r="2.5"/><path d="M17 14.5c2.7.3 4.5 1.9 4.5 4.3"/></svg>
+        </span>
+        <span class="font-display text-[14px] font-bold">References</span>
+        <span id="refsBadge" class="rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-bold text-accent">0</span>
+        <svg class="chev ml-auto text-slate-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
+      <div class="sec-body"><div><div class="space-y-3 p-4 pt-2">
+        <div id="refsList" data-list="references" class="space-y-3"></div>
+        <button type="button" data-act="add-ref" class="btn btn-light w-full border-dashed">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Add reference
+        </button>
+      </div></div></div>
+    </details>
+
+    <div class="flex items-center justify-between px-1">
+      <button data-act="sample" class="text-[12px] font-semibold text-slate-500 underline-offset-2 transition hover:text-ink hover:underline">Load sample data</button>
+      <button data-act="clear" class="text-[12px] font-semibold text-slate-500 underline-offset-2 transition hover:text-red-600 hover:underline">Clear everything</button>
+    </div>
+  </section>
+
+  <!-- ============ Preview pane ============ -->
+  <section id="previewPane" class="flex h-[75vh] flex-col lg:h-full lg:min-h-0">
+    <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-2">
+        <span class="relative flex h-2 w-2">
+          <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60"></span>
+          <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+        </span>
+        <h2 class="font-display text-[15px] font-bold">Live preview</h2>
+        <span class="rounded-full border border-line bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-500">Template · Classic</span>
+      </div>
+      <div class="flex items-center gap-2.5">
+        <label class="lbl !mb-0" for="accentInput">Accent</label>
+        <input type="color" id="accentInput" class="h-7 w-10 cursor-pointer rounded-md border border-line bg-white p-0.5" title="CV accent colour">
+        <select id="zoomSel" class="inp !w-auto !py-1.5 !text-[12px]" title="Zoom">
+          <option value="60">60%</option><option value="80">80%</option>
+          <option value="100" selected>100%</option><option value="125">125%</option>
+        </select>
+        <a id="openLink" target="_blank" rel="noopener" class="btn btn-light !px-2.5 hidden" title="Open share link">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 5h5v5M19 5l-8 8M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2"/></svg>
+        </a>
+      </div>
+    </div>
+    <div class="dotgrid flex-1 overflow-auto rounded-xl border border-line bg-[#EEF0F3] lg:min-h-0">
+      <div class="mx-auto w-fit px-6 py-8">
+        <iframe id="previewFrame" title="CV preview" class="block w-[794px] max-w-none bg-[#E9EBEE] shadow-[0_12px_40px_rgba(15,23,42,.18)]" style="height:1123px"></iframe>
+      </div>
+    </div>
+  </section>
+</main>
+
+<input type="file" id="fileImport" accept="application/json,.json" class="hidden">
+
+<!-- Toast -->
+<div class="pointer-events-none fixed inset-x-0 bottom-5 z-50 flex justify-center px-4">
+  <div id="toast" class="pointer-events-auto flex translate-y-3 items-center gap-3 rounded-lg bg-ink px-4 py-2.5 text-[13px] font-medium text-white opacity-0 shadow-xl transition-all duration-300">
+    <span id="toastMsg"></span>
+    <button id="toastAct" class="hidden font-bold text-accent underline-offset-2 hover:underline"></button>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   VitaKit editor — vanilla JS, no build step (v0.2)
+   ============================================================ */
+const INITIAL   = {{ cv|tojson }};
+const SERVER_ID = {{ cv_id|tojson }};
+const SAMPLE    = {{ sample|tojson }};
+const BLANK     = {{ blank|tojson }};
+const STORE_KEY = 'vitakit.draft.v1';
+
+const $ = (id) => document.getElementById(id);
+const editor = $('editorPane');
+const frame  = $('previewFrame');
+
+let cvId = SERVER_ID;
+let state, lastHTML = '', renderTimer, localTimer, renderToken = 0, pendingScroll = 0;
+
+/* ---------- sanitise (mirrors server normalize_cv) ---------- */
+function sanitizeCV(raw) {
+  raw = (raw && typeof raw === 'object') ? raw : {};
+  const str = (v, l = 4000) => v == null ? '' : String(v).slice(0, l).trim();
+  const meta = (raw.meta && typeof raw.meta === 'object') ? raw.meta : {};
+  const acc = str(meta.accent, 9);
+  const basics = (raw.basics && typeof raw.basics === 'object') ? raw.basics : {};
+  const items = (arr, keys, cap) => Array.isArray(arr)
+    ? arr.slice(0, cap).filter(i => i && typeof i === 'object')
+        .map(i => Object.fromEntries(keys.map(k => [k, str(i[k])])))
+    : [];
+  const strList = (v, cap) => {
+    if (typeof v === 'string') v = v.split(/[,\n]/);
+    return Array.isArray(v) ? v.map(s => str(s, 60)).filter(Boolean).slice(0, cap) : [];
+  };
+  return {
+    meta: { accent: /^#[0-9a-fA-F]{3,8}$/.test(acc) ? acc : '#0E7C66' },
+    basics: Object.fromEntries(['name','title','email','phone','location','website','summary'].map(k => [k, str(basics[k])])),
+    experience:     items(raw.experience,     ['role','company','start','end','details'], 40),
+    education:      items(raw.education,      ['degree','school','start','end','details'], 20),
+    projects:       items(raw.projects,       ['name','link','details'], 20),
+    certifications: items(raw.certifications, ['name','issuer','year'], 20),
+    references:     items(raw.references,     ['name','role','organization','email','phone'], 10),
+    languages:      items(raw.languages,      ['name','level'], 12),
+    skills:     strList(raw.skills, 60),
+    tools:      strList(raw.tools, 60),
+    industries: strList(raw.industries, 40),
+    interests:  strList(raw.interests, 30),
+  };
+}
+
+const EMPTY_ITEM = {
+  experience:     () => ({ role:'', company:'', start:'', end:'', details:'' }),
+  education:      () => ({ degree:'', school:'', start:'', end:'', details:'' }),
+  projects:       () => ({ name:'', link:'', details:'' }),
+  certifications: () => ({ name:'', issuer:'', year:'' }),
+  languages:      () => ({ name:'', level:'Full professional' }),
+  references:     () => ({ name:'', role:'', organization:'', email:'', phone:'' }),
+};
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function setPath(obj, path, value) {
+  const parts = path.split('.'); let o = obj;
+  for (let i = 0; i < parts.length - 1; i++) { o = o[parts[i]]; if (o == null) return; }
+  o[parts[parts.length - 1]] = value;
+}
+
+/* ---------- list rendering ---------- */
+const moveBtn = (i, dir, n) => `
+  <button type="button" data-act="${dir}" class="icon-btn" title="Move ${dir}" ${(dir==='up'&&i===0)||(dir==='down'&&i===n-1)?'disabled':''}>
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="${dir==='up'?'M12 19V5m0 0l-6 6m6-6l6 6':'M12 5v14m0 0l-6-6m6 6l6-6'}"/></svg>
+  </button>`;
+const removeBtn = `
+  <button type="button" data-act="remove" class="icon-btn hover:!bg-red-50 hover:!text-red-600" title="Remove">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4h8v2m-9 0l1 14h8l1-14"/></svg>
+  </button>`;
+
+function cardShell(i, n, innerHTML) {
+  return `
+  <div class="item-card group rounded-lg border border-line bg-white p-3 shadow-sm transition-shadow hover:shadow-md" data-index="${i}">
+    <div class="mb-2 flex items-center gap-2">
+      <span class="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-accent/10 text-[11px] font-bold text-accent">${i + 1}</span>
+      <p class="card-title min-w-0 flex-1 truncate text-[13px] font-semibold text-ink"></p>
+      <div class="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+        ${moveBtn(i,'up',n)}${moveBtn(i,'down',n)}${removeBtn}
+      </div>
+    </div>
+    ${innerHTML}
+  </div>`;
+}
+
+const expCard = (it, i, n) => cardShell(i, n, `
+  <div class="grid grid-cols-2 gap-2">
+    <div><label class="lbl">Role</label><input class="inp" data-path="experience.${i}.role" data-sum value="${esc(it.role)}" placeholder="Product Designer"></div>
+    <div><label class="lbl">Company</label><input class="inp" data-path="experience.${i}.company" data-sum value="${esc(it.company)}" placeholder="Acme Inc."></div>
+    <div><label class="lbl">Start</label><input class="inp" data-path="experience.${i}.start" value="${esc(it.start)}" placeholder="Mar 2021"></div>
+    <div><label class="lbl">End</label><input class="inp" data-path="experience.${i}.end" value="${esc(it.end)}" placeholder="Present"></div>
+    <div class="col-span-2"><label class="lbl">Details <span class="font-normal normal-case text-slate-400">— one bullet per line, starting with “- ”</span></label>
+      <textarea rows="4" class="inp resize-y" data-path="experience.${i}.details">${esc(it.details)}</textarea></div>
+  </div>`);
+
+const eduCard = (it, i, n) => cardShell(i, n, `
+  <div class="grid grid-cols-2 gap-2">
+    <div><label class="lbl">Degree</label><input class="inp" data-path="education.${i}.degree" data-sum value="${esc(it.degree)}" placeholder="BSc Computer Science"></div>
+    <div><label class="lbl">School</label><input class="inp" data-path="education.${i}.school" data-sum value="${esc(it.school)}" placeholder="University of…"></div>
+    <div><label class="lbl">Start</label><input class="inp" data-path="education.${i}.start" value="${esc(it.start)}" placeholder="2016"></div>
+    <div><label class="lbl">End</label><input class="inp" data-path="education.${i}.end" value="${esc(it.end)}" placeholder="2020"></div>
+    <div class="col-span-2"><label class="lbl">Details <span class="font-normal normal-case text-slate-400">(optional)</span></label>
+      <textarea rows="2" class="inp resize-y" data-path="education.${i}.details">${esc(it.details)}</textarea></div>
+  </div>`);
+
+const projCard = (it, i, n) => cardShell(i, n, `
+  <div class="grid grid-cols-2 gap-2">
+    <div><label class="lbl">Project name</label><input class="inp" data-path="projects.${i}.name" data-sum value="${esc(it.name)}" placeholder="OpenShelf"></div>
+    <div><label class="lbl">Link <span class="font-normal normal-case text-slate-400">(optional)</span></label><input class="inp" data-path="projects.${i}.link" value="${esc(it.link)}" placeholder="github.com/you/project"></div>
+    <div class="col-span-2"><label class="lbl">Details <span class="font-normal normal-case text-slate-400">— one bullet per line, starting with “- ”</span></label>
+      <textarea rows="3" class="inp resize-y" data-path="projects.${i}.details">${esc(it.details)}</textarea></div>
+  </div>`);
+
+const certCard = (it, i, n) => cardShell(i, n, `
+  <div class="grid grid-cols-3 gap-2">
+    <div class="col-span-2"><label class="lbl">Certification</label><input class="inp" data-path="certifications.${i}.name" data-sum value="${esc(it.name)}" placeholder="AWS Certified Solutions Architect"></div>
+    <div><label class="lbl">Year</label><input class="inp" data-path="certifications.${i}.year" value="${esc(it.year)}" placeholder="2024"></div>
+    <div class="col-span-3"><label class="lbl">Issuer</label><input class="inp" data-path="certifications.${i}.issuer" data-sum value="${esc(it.issuer)}" placeholder="Amazon Web Services"></div>
+  </div>`);
+
+const LEVELS = ['Native','Fluent','Full professional','Professional','Intermediate','Basic'];
+const langCard = (it, i, n) => cardShell(i, n, `
+  <div class="grid grid-cols-2 gap-2">
+    <div><label class="lbl">Language</label><input class="inp" data-path="languages.${i}.name" data-sum value="${esc(it.name)}" placeholder="English"></div>
+    <div><label class="lbl">Level</label>
+      <select class="inp" data-path="languages.${i}.level" data-sum>
+        ${LEVELS.map(l => `<option value="${l}"${it.level===l?' selected':''}>${l}</option>`).join('')}
+      </select>
+    </div>
+  </div>`);
+
+const refCard = (it, i, n) => cardShell(i, n, `
+  <div class="grid grid-cols-2 gap-2">
+    <div><label class="lbl">Name</label><input class="inp" data-path="references.${i}.name" data-sum value="${esc(it.name)}" placeholder="Jane Doe"></div>
+    <div><label class="lbl">Role</label><input class="inp" data-path="references.${i}.role" value="${esc(it.role)}" placeholder="Head of Design"></div>
+    <div><label class="lbl">Organization</label><input class="inp" data-path="references.${i}.organization" data-sum value="${esc(it.organization)}" placeholder="Acme Inc."></div>
+    <div><label class="lbl">Email</label><input class="inp" type="email" data-path="references.${i}.email" value="${esc(it.email)}" placeholder="jane@acme.com"></div>
+    <div><label class="lbl">Phone <span class="font-normal normal-case text-slate-400">(optional)</span></label><input class="inp" data-path="references.${i}.phone" value="${esc(it.phone)}" placeholder="+1 555 000 0000"></div>
+  </div>`);
+
+const LIST_CONFIG = {
+  experience:     { el:'expList',   badge:'expBadge',   title:['role','company'],   card:expCard,  empty:'No roles yet — add your most recent first.' },
+  education:      { el:'eduList',   badge:'eduBadge',   title:['degree','school'],  card:eduCard,  empty:'No education added yet.' },
+  projects:       { el:'projList',  badge:'projBadge',  title:['name'],             card:projCard, empty:'No projects yet — side projects count too.' },
+  certifications: { el:'certsList', badge:'certsBadge', title:['name','issuer'],    card:certCard, empty:'No certifications yet.' },
+  languages:      { el:'langsList', badge:'langsBadge', title:['name'],             card:langCard, empty:'No languages yet.' },
+  references:     { el:'refsList',  badge:'refsBadge',  title:['name','organization'], card:refCard, empty:'No references yet — aim for two or three people who can vouch for you.' },
+};
+const ADD_MAP = { 'add-exp':'experience', 'add-edu':'education', 'add-proj':'projects',
+                  'add-cert':'certifications', 'add-lang':'languages', 'add-ref':'references' };
+
+function renderList(key) {
+  const c = LIST_CONFIG[key];
+  const arr = state[key], n = arr.length;
+  $(c.el).innerHTML = n ? arr.map((it, i) => c.card(it, i, n)).join('')
+                        : `<div class="rounded-lg border border-dashed border-slate-300 bg-slate-50/60 px-4 py-5 text-center text-[12.5px] text-slate-400">${c.empty}</div>`;
+  $(c.badge).textContent = n;
+  document.querySelectorAll(`#${c.el} .item-card`).forEach(paintCardTitle);
+}
+function renderAllLists() { Object.keys(LIST_CONFIG).forEach(renderList); }
+
+function paintCardTitle(card) {
+  const key = card.closest('[data-list]').dataset.list;
+  const it = state[key][+card.dataset.index];
+  if (!it) return;
+  const [f0, f1] = LIST_CONFIG[key].title;
+  const main = it[f0] || 'New entry';
+  const sub = f1 ? it[f1] : '';
+  card.querySelector('.card-title').textContent = sub ? `${main} · ${sub}` : main;
+}
+
+const STRING_LISTS = ['skills','tools','industries','interests'];
+function syncStringLists() {
+  STRING_LISTS.forEach(k => {
+    const input = $(k + 'Input'); if (input) input.value = state[k].join(', ');
+    const badge = $(k + 'Badge'); if (badge) badge.textContent = state[k].length;
+  });
+}
+function syncAccent() { $('accentInput').value = state.meta.accent; }
+function fillBasicsInputs() {
+  editor.querySelectorAll('[data-path^="basics."]').forEach(el => {
+    el.value = state.basics[el.dataset.path.split('.')[1]] || '';
+  });
+  $('sumCount').textContent = state.basics.summary.length;
+}
+function refreshAll() {
+  fillBasicsInputs(); renderAllLists(); syncStringLists(); syncAccent(); updateScore(); doRender();
+}
+
+/* ---------- completeness ---------- */
+function updateScore() {
+  const b = state.basics;
+  const checks = [
+    ['a name', !!b.name],
+    ['a job title', !!b.title],
+    ['contact info', !!(b.email || b.phone)],
+    ['a location', !!b.location],
+    ['a summary (40+ chars)', b.summary.length >= 40],
+    ['experience with details', state.experience.some(e => e.role && e.details)],
+    ['education', state.education.some(e => e.degree)],
+    ['5+ skills', state.skills.length >= 5],
+    ['a reference with contact info', state.references.some(r => r.name && (r.email || r.phone))],
+  ];
+  const passed = checks.filter(c => c[1]).length;
+  const pct = Math.round(passed / checks.length * 100);
+  $('scoreBar').style.width = pct + '%';
+  $('scoreBar').classList.toggle('!bg-emerald-500', pct === 100);
+  $('scoreLabel').textContent = pct + '%';
+  const missing = checks.filter(c => !c[1]).map(c => c[0]);
+  $('scoreHint').textContent = pct === 100
+    ? 'Looking sharp — export the PDF and go get them.'
+    : 'Next up: ' + missing.slice(0, 2).join(' and ') + '.';
+}
+
+/* ---------- preview rendering ---------- */
+async function fetchHTML() {
+  const res = await fetch('/api/render', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cv: state }),
+  });
+  if (!res.ok) throw new Error('render failed');
+  return res.text();
+}
+async function doRender() {
+  const my = ++renderToken;
+  try {
+    const html = await fetchHTML();
+    if (my !== renderToken || html === lastHTML) return;
+    lastHTML = html;
+    pendingScroll = frame.contentWindow ? frame.contentWindow.scrollY : 0;
+    frame.srcdoc = html;
+  } catch (e) { /* server hiccup — retry on next edit */ }
+}
+function scheduleRender() { clearTimeout(renderTimer); renderTimer = setTimeout(doRender, 250); }
+
+frame.addEventListener('load', () => {
+  try {
+    const doc = frame.contentDocument;
+    if (doc) {
+      frame.style.height = Math.max(1123, doc.documentElement.scrollHeight) + 'px';
+      frame.contentWindow.scrollTo(0, pendingScroll);
+      pendingScroll = 0;
+    }
+  } catch (e) {}
+});
+
+/* ---------- persistence ---------- */
+function setStatus(kind) {
+  const map = {
+    dirty:  ['bg-amber-400',   'Unsaved changes'],
+    saving: ['bg-amber-400 animate-pulse', 'Saving…'],
+    local:  ['bg-emerald-400', 'Autosaved locally'],
+    server: ['bg-emerald-400', 'Saved · shareable'],
+  };
+  const [dot, text] = map[kind];
+  $('statusDot').className = 'h-2 w-2 rounded-full ' + dot;
+  $('statusText').textContent = text;
+}
+function persistLocal() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ id: cvId, cv: state })); } catch (e) {}
+  setStatus('local');
+}
+function scheduleLocal() { clearTimeout(localTimer); localTimer = setTimeout(persistLocal, 700); }
+function onStateChange() {
+  updateScore(); setStatus('dirty'); scheduleLocal(); scheduleRender();
+  document.title = (state.basics.name || 'Untitled CV') + ' · VitaKit';
+}
+async function saveToServer() {
+  setStatus('saving');
+  try {
+    const res = await fetch('/api/save', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: cvId, cv: state }),
+    });
+    if (!res.ok) throw new Error();
+    const j = await res.json();
+    cvId = j.id;
+    history.replaceState(null, '', j.editUrl);
+    const link = $('openLink'); link.href = j.url; link.classList.remove('hidden');
+    persistLocal(); setStatus('server');
+    toast('Saved. Shareable link is ready.', {
+      label: 'Copy link',
+      fn: () => navigator.clipboard?.writeText(location.origin + j.url).then(() => toast('Link copied.')),
+    });
+  } catch (e) { setStatus('dirty'); toast('Could not save — is the Flask server running?'); }
+}
+
+/* ---------- print / import / export ---------- */
+async function printPDF() {
+  try {
+    const html = await fetchHTML();
+    const doPrint = () => { try { frame.contentWindow.focus(); frame.contentWindow.print(); } catch (e) {} };
+    if (html !== lastHTML) {
+      lastHTML = html; frame.srcdoc = html;
+      frame.addEventListener('load', doPrint, { once: true });
+    } else doPrint();
+  } catch (e) { toast('Print failed — save first, then use the share link.'); }
+}
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(blob),
+    download: (state.basics.name || 'cv').toLowerCase().replace(/\s+/g, '-') + '.json',
+  });
+  a.click(); URL.revokeObjectURL(a.href);
+  toast('JSON exported.');
+}
+$('fileImport').addEventListener('change', (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try { state = sanitizeCV(JSON.parse(reader.result)); cvId = null; refreshAll(); onStateChange(); toast('JSON imported.'); }
+    catch (err) { toast('That file is not valid VitaKit JSON.'); }
+  };
+  reader.readAsText(file); e.target.value = '';
+});
+
+/* ---------- toast ---------- */
+let toastTimer;
+function toast(msg, action) {
+  $('toastMsg').textContent = msg;
+  const btn = $('toastAct');
+  if (action) { btn.textContent = action.label; btn.onclick = action.fn; btn.classList.remove('hidden'); }
+  else btn.classList.add('hidden');
+  const t = $('toast');
+  t.classList.remove('opacity-0', 'translate-y-3');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.add('opacity-0', 'translate-y-3'), 3800);
+}
+
+/* ---------- events ---------- */
+function handleFieldInput(t) {
+  if (!t.dataset.path) return;
+  if (STRING_LISTS.includes(t.dataset.path)) {
+    state[t.dataset.path] = t.value.split(/[,\n]/).map(s => s.trim()).filter(Boolean);
+    const badge = $(t.dataset.path + 'Badge'); if (badge) badge.textContent = state[t.dataset.path].length;
+  } else {
+    setPath(state, t.dataset.path, t.value);
+    if (t.hasAttribute('data-sum')) { const card = t.closest('.item-card'); if (card) paintCardTitle(card); }
+    if (t.dataset.path === 'basics.summary') $('sumCount').textContent = t.value.length;
+  }
+  onStateChange();
+}
+editor.addEventListener('input',  (e) => handleFieldInput(e.target));
+editor.addEventListener('change', (e) => { if (e.target.tagName === 'SELECT') handleFieldInput(e.target); });
+
+editor.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-act]');
+  if (!btn) return;
+  const act = btn.dataset.act;
+
+  if (ADD_MAP[act]) {
+    const key = ADD_MAP[act];
+    state[key].push(EMPTY_ITEM[key]());
+    renderList(key); onStateChange();
+    $(LIST_CONFIG[key].el).querySelector('.item-card:last-child input')?.focus();
+    return;
+  }
+  if (act === 'sample') { state = sanitizeCV(SAMPLE); refreshAll(); onStateChange(); toast('Sample data loaded.'); return; }
+  if (act === 'clear') {
+    if (!confirm('Clear everything? This wipes the form and the local draft.')) return;
+    state = sanitizeCV(BLANK); cvId = null; refreshAll(); onStateChange();
+    return;
+  }
+
+  const card = btn.closest('.item-card'); if (!card) return;
+  const key = card.closest('[data-list]').dataset.list;
+  const list = state[key];
+  const i = +card.dataset.index;
+  if (act === 'remove') { list.splice(i, 1); renderList(key); onStateChange(); }
+  if (act === 'up'   && i > 0)             { [list[i-1], list[i]] = [list[i], list[i-1]]; renderList(key); onStateChange(); }
+  if (act === 'down' && i < list.length-1) { [list[i+1], list[i]] = [list[i], list[i+1]]; renderList(key); onStateChange(); }
+});
+
+$('accentInput').addEventListener('input', (e) => { state.meta.accent = e.target.value; onStateChange(); });
+$('zoomSel').addEventListener('change', (e) => { frame.style.zoom = e.target.value / 100; });
+$('saveBtn').addEventListener('click', saveToServer);
+$('pdfBtn').addEventListener('click', printPDF);
+$('exportBtn').addEventListener('click', exportJSON);
+$('importBtn').addEventListener('click', () => $('fileImport').click());
+
+document.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') { e.preventDefault(); saveToServer(); }
+});
+
+$('tabEdit').addEventListener('click', () => {
+  document.body.classList.remove('pv');
+  $('tabEdit').classList.add('tab-on'); $('tabPreview').classList.remove('tab-on');
+});
+$('tabPreview').addEventListener('click', () => {
+  document.body.classList.add('pv');
+  $('tabPreview').classList.add('tab-on'); $('tabEdit').classList.remove('tab-on');
+});
+
+/* ---------- boot ---------- */
+(function init() {
+  let cached = null;
+  try { cached = JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); } catch (e) {}
+  if (!SERVER_ID && cached && cached.cv) { state = sanitizeCV(cached.cv); cvId = cached.id || null; }
+  else state = sanitizeCV(INITIAL);
+  refreshAll();
+  setStatus(cvId ? 'server' : 'local');
+  if (cvId) { const l = $('openLink'); l.href = '/c/' + cvId; l.classList.remove('hidden'); }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ cv.basics.name or 'Untitled' }} — CV</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet">
+<style>
+  :root { --accent: {{ cv.meta.accent }}; --ink:#1B2128; --line:#E4E7EB; }
+  @page { size: A4; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #E9EBEE; color: var(--ink);
+    font-family: "Public Sans", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  body.doc { padding: 84px 16px 56px; }
+
+  .page {
+    width: 210mm; min-height: 297mm; margin: 0 auto; background: #fff;
+    padding: 16mm 15mm 18mm; box-shadow: 0 14px 44px rgba(15,23,42,.22);
+  }
+
+  /* Header */
+  .cv-head { display: flex; justify-content: space-between; gap: 10mm;
+             padding-bottom: 5mm; border-bottom: 2px solid var(--accent); }
+  h1.name { margin: 0; font-family: "Source Serif 4", Georgia, serif;
+            font-weight: 700; font-size: 30px; line-height: 1.15; letter-spacing: -.01em; }
+  p.role { margin: 2mm 0 0; font-size: 11px; font-weight: 700; letter-spacing: .22em;
+           text-transform: uppercase; color: var(--accent); }
+  .contact { font-size: 10.5px; line-height: 1.75; color: #414A55; text-align: right; }
+  .contact a { color: inherit; text-decoration: none; border-bottom: 1px solid #D7DCE2; }
+
+  /* Sections */
+  section { margin-top: 7mm; }
+  h2 { display: flex; align-items: center; gap: 3mm; margin: 0 0 4mm;
+       font-size: 10.5px; font-weight: 700; letter-spacing: .2em;
+       text-transform: uppercase; color: var(--accent); }
+  h2:after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .summary { margin: 0; font-size: 12px; line-height: 1.7; color: #2A3138; white-space: pre-line; }
+
+  /* Entries */
+  .entry + .entry { margin-top: 5mm; }
+  .entry-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8mm; }
+  .role-t { font-size: 13px; font-weight: 700; }
+  .org { font-size: 12.5px; font-weight: 600; color: var(--accent); }
+  .plink { font-size: 11px; font-weight: 600; color: var(--accent); }
+  .dates { font-size: 10.5px; color: #77828E; white-space: nowrap; letter-spacing: .02em;
+           font-variant-numeric: tabular-nums; }
+  .entry p { margin: 1.6mm 0 0; font-size: 12px; line-height: 1.65; color: #39424C; }
+  ul.b { margin: 1.8mm 0 0; padding-left: 4.2mm; }
+  ul.b li { margin-top: 1.1mm; font-size: 12px; line-height: 1.6; color: #39424C; }
+  ul.b li::marker { color: var(--accent); }
+
+  /* Chips */
+  .skills { display: flex; flex-wrap: wrap; gap: 1.8mm; }
+  .chip { font-size: 10.5px; font-weight: 600; color: var(--accent);
+          background: color-mix(in srgb, var(--accent) 8%, #fff);
+          border: 1px solid color-mix(in srgb, var(--accent) 30%, #fff);
+          padding: 1.3mm 3mm; border-radius: 999px; }
+  .chip-ghost { font-size: 10.5px; font-weight: 500; color: #414A55;
+                background: transparent; border: 1px solid #D7DCE2;
+                padding: 1.3mm 3mm; border-radius: 999px; }
+
+  /* Languages */
+  .langs { display: flex; flex-wrap: wrap; gap: 2.5mm 8mm; }
+  .lang { font-size: 12px; font-weight: 600; }
+  .lang span { color: #77828E; font-size: 11px; font-weight: 500; }
+
+  /* References */
+  .refs { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm 10mm; }
+  .ref-name { margin: 0; font-size: 12.5px; font-weight: 700; }
+  .ref-role { margin: 1mm 0 0; font-size: 11.5px; font-weight: 600; color: var(--accent); }
+  .ref-c { margin: 1mm 0 0; font-size: 11px; color: #5C6672; line-height: 1.7; }
+
+  .empty { color: #98A1AC; font-size: 12px; font-style: italic; }
+
+  /* Toolbar (standalone view only) */
+  .toolbar { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 60;
+             display: flex; align-items: center; gap: 6px; padding: 6px 6px 6px 14px;
+             border-radius: 999px; background: #0B1526; color: #fff;
+             box-shadow: 0 12px 32px rgba(2,8,23,.35); font: 500 13px/1 "Public Sans", sans-serif; }
+  .toolbar .t-edit { color: rgba(255,255,255,.75); text-decoration: none;
+                     padding: 8px 10px; border-radius: 999px; }
+  .toolbar .t-edit:hover { background: rgba(255,255,255,.12); color: #fff; }
+  .toolbar .t-print { border: 0; cursor: pointer; background: var(--accent); color: #fff;
+                      font: inherit; font-weight: 600; padding: 9px 14px; border-radius: 999px; }
+  .toolbar .t-print:hover { filter: brightness(1.08); }
+  .toolbar .t-hint { color: rgba(255,255,255,.4); font-size: 11px; padding: 0 8px 0 4px; }
+
+  @media print {
+    body { background: #fff; padding: 0; }
+    .page { box-shadow: none; margin: 0; width: auto; min-height: 0; }
+    .toolbar { display: none !important; }
+  }
+</style>
+</head>
+<body{% if standalone %} class="doc"{% endif %}>
+{% if standalone and cv_id %}
+<div class="toolbar">
+  <a class="t-edit" href="{{ url_for('editor_existing', cv_id=cv_id) }}">← Edit</a>
+  <button class="t-print" onclick="window.print()">Print / Save as PDF</button>
+  <span class="t-hint">Ctrl/⌘ P</span>
+</div>
+{% endif %}
+
+{% set b = cv.basics %}
+{% set exp   = cv.experience|anyfield %}
+{% set edu   = cv.education|anyfield %}
+{% set projs = cv.projects|anyfield %}
+{% set certs = cv.certifications|anyfield %}
+{% set refs  = cv.references|anyfield %}
+{% set langs = cv.languages|anyfield %}
+<article class="page">
+
+  {% if b.name or b.title or b.email or b.phone or b.location or b.website %}
+  <header class="cv-head">
+    <div>
+      {% if b.name %}<h1 class="name">{{ b.name }}</h1>{% endif %}
+      {% if b.title %}<p class="role">{{ b.title }}</p>{% endif %}
+    </div>
+    {% if b.email or b.phone or b.location or b.website %}
+    <div class="contact">
+      {% if b.email %}<div>{{ b.email }}</div>{% endif %}
+      {% if b.phone %}<div>{{ b.phone }}</div>{% endif %}
+      {% if b.location %}<div>{{ b.location }}</div>{% endif %}
+      {% if b.website %}<div><a href="{{ b.website if b.website.startswith('http') else 'https://' + b.website }}" target="_blank" rel="noopener">{{ b.website|replace('https://','')|replace('http://','') }}</a></div>{% endif %}
+    </div>
+    {% endif %}
+  </header>
+  {% endif %}
+
+  {% if b.summary %}
+  <section>
+    <h2>Profile</h2>
+    <p class="summary">{{ b.summary }}</p>
+  </section>
+  {% endif %}
+
+  {% if exp %}
+  <section>
+    <h2>Experience</h2>
+    {% for e in exp %}
+    <div class="entry">
+      <div class="entry-head">
+        <div>
+          <span class="role-t">{{ e.role or 'Role' }}</span>{% if e.company %}<span class="org"> · {{ e.company }}</span>{% endif %}
+        </div>
+        {% if e.start or e.end %}
+        <span class="dates">{{ e.start }}{% if e.start and e.end %} – {% endif %}{{ e.end }}</span>
+        {% endif %}
+      </div>
+      {% set bullets = e.details|bullets %}
+      {% if bullets %}
+      <ul class="b">{% for line in bullets %}<li>{{ line }}</li>{% endfor %}</ul>
+      {% elif e.details %}
+      <p>{{ e.details }}</p>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if cv.industries %}
+  <section>
+    <h2>Industry experience</h2>
+    <div class="skills">{% for s in cv.industries %}<span class="chip-ghost">{{ s }}</span>{% endfor %}</div>
+  </section>
+  {% endif %}
+
+  {% if projs %}
+  <section>
+    <h2>Projects</h2>
+    {% for p in projs %}
+    <div class="entry">
+      <div class="entry-head">
+        <div>
+          <span class="role-t">{{ p.name or 'Project' }}</span>{% if p.link %} <span class="plink">· {{ p.link|replace('https://','')|replace('http://','') }}</span>{% endif %}
+        </div>
+      </div>
+      {% set bullets = p.details|bullets %}
+      {% if bullets %}
+      <ul class="b">{% for line in bullets %}<li>{{ line }}</li>{% endfor %}</ul>
+      {% elif p.details %}
+      <p>{{ p.details }}</p>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if edu %}
+  <section>
+    <h2>Education</h2>
+    {% for e in edu %}
+    <div class="entry">
+      <div class="entry-head">
+        <div>
+          <span class="role-t">{{ e.degree or 'Qualification' }}</span>{% if e.school %}<span class="org"> · {{ e.school }}</span>{% endif %}
+        </div>
+        {% if e.start or e.end %}
+        <span class="dates">{{ e.start }}{% if e.start and e.end %} – {% endif %}{{ e.end }}</span>
+        {% endif %}
+      </div>
+      {% if e.details %}<p>{{ e.details }}</p>{% endif %}
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if certs %}
+  <section>
+    <h2>Certifications</h2>
+    {% for c in certs %}
+    <div class="entry">
+      <div class="entry-head">
+        <div>
+          <span class="role-t">{{ c.name or 'Certification' }}</span>{% if c.issuer %}<span class="org"> · {{ c.issuer }}</span>{% endif %}
+        </div>
+        {% if c.year %}<span class="dates">{{ c.year }}</span>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if cv.skills %}
+  <section>
+    <h2>Skills</h2>
+    <div class="skills">{% for s in cv.skills %}<span class="chip">{{ s }}</span>{% endfor %}</div>
+  </section>
+  {% endif %}
+
+  {% if cv.tools %}
+  <section>
+    <h2>Tools</h2>
+    <div class="skills">{% for s in cv.tools %}<span class="chip-ghost">{{ s }}</span>{% endfor %}</div>
+  </section>
+  {% endif %}
+
+  {% if langs %}
+  <section>
+    <h2>Languages</h2>
+    <div class="langs">
+      {% for l in langs %}<span class="lang">{{ l.name }}{% if l.level %} <span>· {{ l.level }}</span>{% endif %}</span>{% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if cv.interests %}
+  <section>
+    <h2>Interests</h2>
+    <div class="skills">{% for s in cv.interests %}<span class="chip-ghost">{{ s }}</span>{% endfor %}</div>
+  </section>
+  {% endif %}
+
+  {% if refs %}
+  <section>
+    <h2>References</h2>
+    <div class="refs">
+      {% for r in refs %}
+      <div class="ref">
+        <p class="ref-name">{{ r.name or 'Reference' }}</p>
+        {% if r.role or r.organization %}<p class="ref-role">{{ r.role }}{% if r.role and r.organization %} · {% endif %}{{ r.organization }}</p>{% endif %}
+        {% if r.email or r.phone %}
+        <p class="ref-c">
+          {% if r.email %}<span>{{ r.email }}</span>{% endif %}
+          {% if r.phone %}<span>{{ r.phone }}</span>{% endif %}
+        </p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if not (b.name or b.title or b.summary or exp or edu or projs or certs or refs or langs
+             or cv.skills or cv.tools or cv.industries or cv.interests) %}
+  <p class="empty">This CV is empty — start typing in the editor and it will render here live.</p>
+  {% endif %}
+
+</article>
+</body>
+</html>
