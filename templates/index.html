@@ -141,6 +141,18 @@ tailwind.config = {
           <div><label class="lbl">Location</label><input class="inp" data-path="basics.location" placeholder="Lisbon, Portugal"></div>
           <div><label class="lbl">Website</label><input class="inp" data-path="basics.website" placeholder="yoursite.com"></div>
         </div>
+        <div>
+          <div class="flex items-center justify-between">
+            <label class="lbl !mb-0">Social &amp; code links</label>
+            <span id="socialsBadge" class="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-bold text-accent">0</span>
+          </div>
+          <div id="socialsList" data-list="socials" class="mt-1.5 space-y-2"></div>
+          <button type="button" data-act="add-social" class="btn btn-light mt-2 w-full border-dashed !py-1.5 !text-[12px]">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            Add social link
+          </button>
+          <p class="mt-1 text-[11px] text-slate-400">GitHub, GitLab, LinkedIn, Mastodon… shown under your name on the CV.</p>
+        </div>
       </div></div></div>
     </details>
 
@@ -376,6 +388,22 @@ tailwind.config = {
 
 <input type="file" id="fileImport" accept="application/json,.json" class="hidden">
 
+<datalist id="socialLabels">
+  <option value="GitHub"></option>
+  <option value="GitLab"></option>
+  <option value="LinkedIn"></option>
+  <option value="Twitter / X"></option>
+  <option value="Bluesky"></option>
+  <option value="Mastodon"></option>
+  <option value="Dribbble"></option>
+  <option value="Behance"></option>
+  <option value="Stack Overflow"></option>
+  <option value="Medium"></option>
+  <option value="YouTube"></option>
+  <option value="Instagram"></option>
+  <option value="Personal site"></option>
+</datalist>
+
 <!-- Toast -->
 <div class="pointer-events-none fixed inset-x-0 bottom-5 z-50 flex justify-center px-4">
   <div id="toast" class="pointer-events-auto flex translate-y-3 items-center gap-3 rounded-lg bg-ink px-4 py-2.5 text-[13px] font-medium text-white opacity-0 shadow-xl transition-all duration-300">
@@ -425,6 +453,7 @@ function sanitizeCV(raw) {
     certifications: items(raw.certifications, ['name','issuer','year'], 20),
     references:     items(raw.references,     ['name','role','organization','email','phone'], 10),
     languages:      items(raw.languages,      ['name','level'], 12),
+    socials:        items(raw.socials,        ['label','url'], 12),
     skills:     strList(raw.skills, 60),
     tools:      strList(raw.tools, 60),
     industries: strList(raw.industries, 40),
@@ -439,6 +468,7 @@ const EMPTY_ITEM = {
   certifications: () => ({ name:'', issuer:'', year:'' }),
   languages:      () => ({ name:'', level:'Full professional' }),
   references:     () => ({ name:'', role:'', organization:'', email:'', phone:'' }),
+  socials:        () => ({ label:'', url:'' }),
 };
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -527,6 +557,14 @@ const refCard = (it, i, n) => cardShell(i, n, `
     <div><label class="lbl">Phone <span class="font-normal normal-case text-slate-400">(optional)</span></label><input class="inp" data-path="references.${i}.phone" value="${esc(it.phone)}" placeholder="+1 555 000 0000"></div>
   </div>`);
 
+const socialCard = (it, i, n) => cardShell(i, n, `
+  <div class="grid grid-cols-5 gap-2">
+    <div class="col-span-2"><label class="lbl">Label</label>
+      <input class="inp" list="socialLabels" data-path="socials.${i}.label" data-sum value="${esc(it.label)}" placeholder="GitHub"></div>
+    <div class="col-span-3"><label class="lbl">URL or handle</label>
+      <input class="inp" data-path="socials.${i}.url" data-sum value="${esc(it.url)}" placeholder="github.com/you"></div>
+  </div>`);
+
 const LIST_CONFIG = {
   experience:     { el:'expList',   badge:'expBadge',   title:['role','company'],   card:expCard,  empty:'No roles yet — add your most recent first.' },
   education:      { el:'eduList',   badge:'eduBadge',   title:['degree','school'],  card:eduCard,  empty:'No education added yet.' },
@@ -534,9 +572,11 @@ const LIST_CONFIG = {
   certifications: { el:'certsList', badge:'certsBadge', title:['name','issuer'],    card:certCard, empty:'No certifications yet.' },
   languages:      { el:'langsList', badge:'langsBadge', title:['name'],             card:langCard, empty:'No languages yet.' },
   references:     { el:'refsList',  badge:'refsBadge',  title:['name','organization'], card:refCard, empty:'No references yet — aim for two or three people who can vouch for you.' },
+  socials:        { el:'socialsList', badge:'socialsBadge', title:['label','url'], card:socialCard, empty:'No links yet — add your GitHub, GitLab, LinkedIn…' },
 };
 const ADD_MAP = { 'add-exp':'experience', 'add-edu':'education', 'add-proj':'projects',
-                  'add-cert':'certifications', 'add-lang':'languages', 'add-ref':'references' };
+                  'add-cert':'certifications', 'add-lang':'languages', 'add-ref':'references',
+                  'add-social':'socials' };
 
 function renderList(key) {
   const c = LIST_CONFIG[key];

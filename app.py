@@ -32,6 +32,7 @@ LIST_SPECS = (
     ("certifications", ("name", "issuer", "year"), 20),
     ("references",     ("name", "role", "organization", "email", "phone"), 10),
     ("languages",      ("name", "level"), 12),
+    ("socials",        ("label", "url"), 12),
 )
 # (section, max items) — list-of-string sections (comma / newline separated)
 STR_LIST_SPECS = (("skills", 60), ("tools", 60), ("industries", 40), ("interests", 30))
@@ -141,6 +142,11 @@ SAMPLE_CV = {
         {"name": "Portuguese", "level": "Native"},
         {"name": "English", "level": "Fluent"},
         {"name": "Spanish", "level": "Professional"},
+    ],
+    "socials": [
+        {"label": "GitHub",   "url": "github.com/arivera"},
+        {"label": "LinkedIn", "url": "linkedin.com/in/alexrivera"},
+        {"label": "Dribbble", "url": "dribbble.com/arivera"},
     ],
     "industries": ["SaaS", "Fintech", "E-commerce", "Marketplaces", "EdTech"],
     "interests": ["Analog photography", "Trail running", "Typography", "Ceramics"],
